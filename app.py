@@ -100,10 +100,16 @@ def countdown(seconds: int, status_callback) -> None:
         time.sleep(1)
 
 
-def run_typing(text: str, status_callback, progress_callback, pause_event: threading.Event) -> None:
+def run_typing(
+    text: str,
+    status_callback,
+    progress_callback,
+    pause_event: threading.Event,
+    wpm: int,
+) -> None:
     countdown(3, status_callback)
     status_callback("Typing in progress...")
-    type_human_like(text, WPM, ACCURACY, progress_callback, pause_event)
+    type_human_like(text, wpm, ACCURACY, progress_callback, pause_event)
     status_callback("Done.")
 
 
@@ -144,10 +150,26 @@ class App(tk.Tk):
         settings = ttk.Frame(self)
         settings.pack(fill="x", padx=16, pady=(8, 16))
 
-        ttk.Label(settings, text="Fixed speed:").pack(side="left")
-        ttk.Label(settings, text=f"{WPM} WPM").pack(side="left", padx=(4, 16))
+        ttk.Label(settings, text="Speed:").pack(side="left")
+        self.speed_var = tk.IntVar(value=WPM)
+        self.speed_label = ttk.Label(settings, text=f"{self.speed_var.get()} WPM")
+        self.speed_label.pack(side="left", padx=(4, 8))
+        self.speed_slider = ttk.Scale(
+            settings,
+            from_=10,
+            to=80,
+            orient="horizontal",
+            command=self.on_speed_change,
+            value=self.speed_var.get(),
+        )
+        self.speed_slider.pack(side="left", padx=(0, 16), fill="x", expand=True)
         ttk.Label(settings, text="Accuracy:").pack(side="left")
         ttk.Label(settings, text=f"{int(ACCURACY * 100)}%").pack(side="left", padx=(4, 0))
+
+    def on_speed_change(self, value: str) -> None:
+        wpm_value = int(float(value))
+        self.speed_var.set(wpm_value)
+        self.speed_label.configure(text=f"{wpm_value} WPM")
 
     def on_start(self) -> None:
         text = self.text_input.get("1.0", "end-1c")
@@ -155,6 +177,7 @@ class App(tk.Tk):
             self.status_var.set("Please paste some text first.")
             return
 
+        wpm_value = self.speed_var.get()
         self.is_running = True
         self.pause_event.set()
         self.start_button.configure(state="disabled")
@@ -168,7 +191,7 @@ class App(tk.Tk):
             self.progress_var.set(f"{done} / {total}")
 
         def worker() -> None:
-            run_typing(text, status_callback, progress_callback, self.pause_event)
+            run_typing(text, status_callback, progress_callback, self.pause_event, wpm_value)
             self.is_running = False
             self.start_button.configure(state="normal")
             self.pause_button.configure(state="disabled", text="Pause")
