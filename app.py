@@ -33,27 +33,23 @@ def human_delay(base_delay: float) -> float:
     return max(0.03, base_delay + jitter)
 
 
-def build_scaled_delays(text: str, base_delay: float) -> list[float]:
+def build_delays(text: str, base_delay: float) -> list[float]:
     delays: list[float] = []
     for char in text:
         if char == "\n":
-            delay = base_delay * 1.4
+            delay = random.uniform(0.6, 2.0)
         elif char == "\t":
-            delay = base_delay * 1.1
+            delay = base_delay * 0.4
         elif char in ".!?":
-            delay = base_delay * 3.2
+            delay = random.uniform(4.0, 20.0)
         elif char in ",;:":
-            delay = base_delay * 2.0
+            delay = random.uniform(0.8, 2.5)
         elif char == " ":
-            delay = base_delay * 1.6
+            delay = random.uniform(0.5, 3.0)
         else:
-            delay = base_delay * 0.55
+            delay = base_delay * 0.08
         delays.append(delay)
-
-    target_total = len(text) * base_delay
-    current_total = sum(delays) or 1.0
-    scale = target_total / current_total
-    return [delay * scale for delay in delays]
+    return delays
 
 
 def type_human_like(
@@ -64,7 +60,7 @@ def type_human_like(
     pause_event: threading.Event,
 ) -> None:
     base_delay = seconds_per_char(wpm)
-    delays = build_scaled_delays(text, base_delay)
+    delays = build_delays(text, base_delay)
     for idx, char in enumerate(text):
         pause_event.wait()
         if char == "\n":
