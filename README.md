@@ -5,6 +5,7 @@ A simple Windows 11 desktop app that accepts a pasted block of text and then typ
 ## Features
 - Paste text into a textbox and click **Start Typing**.
 - Simulated human typing cadence (variable delays, word pauses).
+- **Human code** mode types identifiers and keywords in quick bursts, hesitates around operators and delimiters, and pauses to review completed lines and code blocks.
 - 98% accuracy simulation (occasional typo + correction).
 
 ## Requirements
@@ -44,5 +45,7 @@ If Tkinter is missing from the system Python, use a user-space Python distributi
 
 ## How it works
 The app uses `pyautogui` to type into the **currently focused** window. After pressing **Start Typing**, you get a short countdown to switch focus to the target application (e.g., Notepad, Word, browser text field).
+
+Choose **Natural text** for prose or **Human code** for source code before clicking **Start Typing**. The speed slider affects either mode, and Pause/Resume also works during the longer thinking pauses.
 
 > Note: You may need to allow Python to control your keyboard in Windows security settings.

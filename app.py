@@ -8,6 +8,8 @@ import pyautogui
 
 WPM = 33
 ACCURACY = 0.98
+TEXT_MODE = "Natural text"
+CODE_MODE = "Human code"
 
 
 def seconds_per_char(wpm: int) -> float:
@@ -33,23 +35,86 @@ def human_delay(base_delay: float) -> float:
     return max(0.03, base_delay + jitter)
 
 
-def build_delays(text: str, base_delay: float) -> list[float]:
+def build_text_delays(text: str, base_delay: float) -> list[float]:
+    pace = base_delay / seconds_per_char(WPM)
     delays: list[float] = []
     for char in text:
         if char == "\n":
-            delay = random.uniform(0.6, 2.0)
+            delay = random.uniform(0.6, 2.0) * pace
         elif char == "\t":
             delay = base_delay * 0.4
         elif char in ".!?":
-            delay = random.uniform(4.0, 20.0)
+            delay = random.uniform(4.0, 20.0) * pace
         elif char in ",;:":
-            delay = random.uniform(0.8, 2.5)
+            delay = random.uniform(0.8, 2.5) * pace
         elif char == " ":
-            delay = random.uniform(0.5, 3.0)
+            delay = random.uniform(0.5, 3.0) * pace
         else:
             delay = base_delay * 0.08
         delays.append(delay)
     return delays
+
+
+def build_code_delays(text: str, base_delay: float) -> list[float]:
+    """Build a bursty cadence resembling a programmer composing code."""
+    pace = base_delay / seconds_per_char(WPM)
+    delays: list[float] = []
+    for index, char in enumerate(text):
+        previous = text[index - 1] if index else ""
+        following = text[index + 1] if index + 1 < len(text) else ""
+
+        if char == "\n":
+            # People pause to review a completed line; blank lines imply a larger
+            # transition between thoughts or blocks.
+            delay = random.uniform(1.0, 3.5) * pace
+            if previous == "\n" or following == "\n":
+                delay += random.uniform(1.0, 4.0) * pace
+        elif char == "\t":
+            delay = base_delay * random.uniform(0.08, 0.18)
+        elif char in "{}":
+            delay = random.uniform(0.7, 2.2) * pace
+        elif char in ";":
+            delay = random.uniform(0.5, 1.6) * pace
+        elif char in ",":
+            delay = random.uniform(0.15, 0.65) * pace
+        elif char in "()[]":
+            delay = base_delay * random.uniform(0.15, 0.45)
+        elif char in "=+-*/%<>!&|^~?:":
+            delay = random.uniform(0.12, 0.8) * pace
+        elif char == " ":
+            # Indentation and spaces around syntax are entered quickly. A space
+            # after an identifier is a short planning pause before the next token.
+            if previous in "\n\t " or following in "=+-*/%<>!&|^~?:{}()[]":
+                delay = base_delay * random.uniform(0.08, 0.25)
+            else:
+                delay = random.uniform(0.2, 1.0) * pace
+        elif char.isalnum() or char == "_":
+            # Identifiers and keywords are typed in fast muscle-memory bursts.
+            delay = base_delay * random.uniform(0.06, 0.16)
+            if following and not (following.isalnum() or following == "_"):
+                delay += random.uniform(0.08, 0.45) * pace
+        else:
+            delay = base_delay * random.uniform(0.12, 0.35)
+        delays.append(delay)
+    return delays
+
+
+def build_delays(text: str, base_delay: float, mode: str = TEXT_MODE) -> list[float]:
+    if mode == CODE_MODE:
+        return build_code_delays(text, base_delay)
+    return build_text_delays(text, base_delay)
+
+
+def pausable_sleep(seconds: float, pause_event: threading.Event) -> None:
+    """Sleep for active typing time while responding quickly to Pause."""
+    remaining = max(0.0, seconds)
+    while remaining > 0:
+        pause_event.wait()
+        interval = min(0.05, remaining)
+        started = time.monotonic()
+        time.sleep(interval)
+        if pause_event.is_set():
+            remaining -= time.monotonic() - started
 
 
 def type_human_like(
@@ -58,35 +123,36 @@ def type_human_like(
     accuracy: float,
     status_callback,
     pause_event: threading.Event,
+    mode: str = TEXT_MODE,
 ) -> None:
     base_delay = seconds_per_char(wpm)
-    delays = build_delays(text, base_delay)
+    delays = build_delays(text, base_delay, mode)
     for idx, char in enumerate(text):
         pause_event.wait()
         if char == "\n":
             pyautogui.press("enter")
-            time.sleep(human_delay(delays[idx]))
+            pausable_sleep(human_delay(delays[idx]), pause_event)
             continue
 
         if char == "\t":
             pyautogui.press("tab")
-            time.sleep(human_delay(delays[idx]))
+            pausable_sleep(human_delay(delays[idx]), pause_event)
             continue
 
         should_typo = random.random() > accuracy and char.strip() != ""
         if should_typo:
             typo_char = choose_typo_char(char)
             pyautogui.write(typo_char)
-            time.sleep(human_delay(delays[idx] * 0.8))
+            pausable_sleep(human_delay(delays[idx] * 0.8), pause_event)
             pyautogui.press("backspace")
-            time.sleep(random.uniform(0.05, 0.12))
+            pausable_sleep(random.uniform(0.05, 0.12), pause_event)
 
         pyautogui.write(char)
 
-        time.sleep(human_delay(delays[idx]))
+        pausable_sleep(human_delay(delays[idx]), pause_event)
 
         if idx % 40 == 0 and idx > 0:
-            time.sleep(random.uniform(0.1, 0.3))
+            pausable_sleep(random.uniform(0.1, 0.3), pause_event)
         status_callback(idx + 1, len(text))
 
 
@@ -102,10 +168,11 @@ def run_typing(
     progress_callback,
     pause_event: threading.Event,
     wpm: int,
+    mode: str,
 ) -> None:
     countdown(3, status_callback)
     status_callback("Typing in progress...")
-    type_human_like(text, wpm, ACCURACY, progress_callback, pause_event)
+    type_human_like(text, wpm, ACCURACY, progress_callback, pause_event, mode)
     status_callback("Done.")
 
 
@@ -146,6 +213,17 @@ class App(tk.Tk):
         settings = ttk.Frame(self)
         settings.pack(fill="x", padx=16, pady=(8, 16))
 
+        ttk.Label(settings, text="Mode:").pack(side="left")
+        self.mode_var = tk.StringVar(value=TEXT_MODE)
+        self.mode_picker = ttk.Combobox(
+            settings,
+            textvariable=self.mode_var,
+            values=(TEXT_MODE, CODE_MODE),
+            state="readonly",
+            width=13,
+        )
+        self.mode_picker.pack(side="left", padx=(4, 16))
+
         ttk.Label(settings, text="Speed:").pack(side="left")
         self.speed_var = tk.IntVar(value=WPM)
         self.speed_label = ttk.Label(settings, text=f"{self.speed_var.get()} WPM")
@@ -174,10 +252,12 @@ class App(tk.Tk):
             return
 
         wpm_value = self.speed_var.get()
+        mode = self.mode_var.get()
         self.is_running = True
         self.pause_event.set()
         self.start_button.configure(state="disabled")
         self.pause_button.configure(state="normal", text="Pause")
+        self.mode_picker.configure(state="disabled")
         self.progress_var.set(f"0 / {len(text)}")
 
         def status_callback(message: str) -> None:
@@ -187,10 +267,18 @@ class App(tk.Tk):
             self.progress_var.set(f"{done} / {total}")
 
         def worker() -> None:
-            run_typing(text, status_callback, progress_callback, self.pause_event, wpm_value)
+            run_typing(
+                text,
+                status_callback,
+                progress_callback,
+                self.pause_event,
+                wpm_value,
+                mode,
+            )
             self.is_running = False
             self.start_button.configure(state="normal")
             self.pause_button.configure(state="disabled", text="Pause")
+            self.mode_picker.configure(state="readonly")
 
         threading.Thread(target=worker, daemon=True).start()
 
