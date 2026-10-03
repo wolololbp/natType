@@ -5,7 +5,6 @@ A simple Windows 11 desktop app that accepts a pasted block of text and then typ
 ## Features
 - Paste text into a textbox and click **Start Typing**.
 - Simulated human typing cadence (variable delays, word pauses).
-- **Human code** mode types identifiers and keywords in quick bursts, hesitates around operators and delimiters, and pauses to review completed lines and code blocks.
 - 98% accuracy simulation (occasional typo + correction).
 
 ## Requirements
@@ -24,28 +23,16 @@ python app.py
 
 ## Run (Linux Mint)
 ```bash
-python3 app_linux.py
+python app_linux.py
 ```
 
-### Linux Mint (no admin privileges)
-On many Linux Mint installs, use `python3` (not `python`).
-This app can run without administrator rights. Use a user-space Python and install dependencies in a virtual environment:
+### Linux Mint dependencies
+You may need to install system packages for Tkinter and PyAutoGUI:
 ```bash
-python3 -m venv .venv
-source .venv/bin/activate
-python3 -m pip install --upgrade pip
-pip install -r requirements.txt
+sudo apt-get install python3-tk scrot
 ```
-
-If you see `bash: .venv/bin/activate: No such file or directory`, the virtual environment was not created. Run the `python3 -m venv .venv` command first, and confirm the `.venv/` folder exists before activating it.
-
-If the `venv` module is unavailable in your system Python, use a user-space Python distribution (such as pyenv or Miniconda) that includes Tkinter and `venv`, then repeat the steps above.
-
-If Tkinter is missing from the system Python, use a user-space Python distribution (such as pyenv or Miniconda) that includes Tkinter. PyAutoGUI does not require system packages for basic keyboard typing; optional screenshot features may require additional system tools, but they are not used by this app.
 
 ## How it works
 The app uses `pyautogui` to type into the **currently focused** window. After pressing **Start Typing**, you get a short countdown to switch focus to the target application (e.g., Notepad, Word, browser text field).
-
-Choose **Natural text** for prose or **Human code** for source code before clicking **Start Typing**. The speed slider affects either mode, and Pause/Resume also works during the longer thinking pauses.
 
 > Note: You may need to allow Python to control your keyboard in Windows security settings.
